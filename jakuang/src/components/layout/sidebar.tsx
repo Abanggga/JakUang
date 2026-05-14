@@ -17,29 +17,42 @@ const bottomNavItems = [
   { href: "/tax-export", label: "Tax Export", icon: "file_export" },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIsOpen?: (v: boolean) => void }) {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-72 bg-primary shadow-sm z-50 flex flex-col py-6">
+    <aside 
+      className={cn(
+        "fixed left-0 top-0 h-full w-72 bg-primary shadow-sm z-50 flex flex-col py-6 transition-transform duration-300 lg:translate-x-0",
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      )}
+    >
       {/* Brand */}
-      <div className="px-6 mb-8 flex items-center gap-4">
-        <div className="w-12 h-12 rounded-xl bg-surface flex items-center justify-center shadow-md overflow-hidden">
-          <Image src="/logo.png" alt="JakUang" width={40} height={40} className="object-contain" priority />
+      <div className="px-6 mb-8 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-surface flex items-center justify-center shadow-md overflow-hidden shrink-0">
+            <Image src="/logo.png" alt="JakUang" width={40} height={40} className="object-contain" priority />
+          </div>
+          <div>
+            <h1 className="text-headline-sm font-bold text-on-primary tracking-tight">
+              JakUang <span className="text-primary-fixed text-sm font-normal ml-1">v1.0</span>
+            </h1>
+            <p className="text-label-sm text-on-primary/70 uppercase tracking-widest mt-0.5">
+              Financial OS
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-headline-sm font-bold text-on-primary tracking-tight">
-            JakUang <span className="text-primary-fixed text-sm font-normal ml-1">v1.0</span>
-          </h1>
-          <p className="text-label-sm text-on-primary/70 uppercase tracking-widest mt-0.5">
-            Financial OS
-          </p>
-        </div>
+        <button 
+          className="lg:hidden text-on-primary p-1"
+          onClick={() => setIsOpen?.(false)}
+        >
+          <span className="material-symbols-outlined">close</span>
+        </button>
       </div>
 
       {/* Snap & Record CTA */}
       <div className="px-6 mb-4">
-        <button className="w-full bg-secondary-container text-on-secondary-container text-label-md font-bold py-3.5 rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
+        <button className="w-full bg-primary-fixed text-on-primary-fixed font-bold py-3.5 rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
           <span className="material-symbols-outlined">camera_alt</span>
           Snap & Record
         </button>
@@ -48,11 +61,12 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-4 space-y-1">
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setIsOpen?.(false)}
               className={cn(
                 "px-4 py-3.5 flex items-center gap-3 rounded-xl transition-all duration-200",
                 isActive
@@ -74,11 +88,12 @@ export function Sidebar() {
         {/* Tax Export separated */}
         <div className="pt-6">
           {bottomNavItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setIsOpen?.(false)}
                 className={cn(
                   "px-4 py-3.5 flex items-center gap-3 rounded-xl transition-all duration-200",
                   isActive
@@ -101,7 +116,7 @@ export function Sidebar() {
 
       {/* User */}
       <div className="px-6 mt-auto flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-primary-container flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-primary-container flex items-center justify-center shrink-0">
           <span className="material-symbols-outlined text-primary text-[20px]">person</span>
         </div>
         <div className="text-on-primary">
