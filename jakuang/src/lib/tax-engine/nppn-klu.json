@@ -1,0 +1,19 @@
+{
+  "62010": { "ibukota_provinsi": 50, "ibukota_lainnya": 50, "daerah_lainnya": 50 },
+  "69100": { "ibukota_provinsi": 51, "ibukota_lainnya": 50, "daerah_lainnya": 50 },
+  "74100": { "ibukota_provinsi": 32, "ibukota_lainnya": 31, "daerah_lainnya": 29 },
+  "74201": { "ibukota_provinsi": 50, "ibukota_lainnya": 50, "daerah_lainnya": 50 },
+  "86201": { "ibukota_provinsi": 50, "ibukota_lainnya": 50, "daerah_lainnya": 50 },
+  "86202": { "ibukota_provinsi": 50, "ibukota_lainnya": 50, "daerah_lainnya": 50 },
+  "90001": { "ibukota_provinsi": 35, "ibukota_lainnya": 32.5, "daerah_lainnya": 31.5 },
+  "90002": { "ibukota_provinsi": 50, "ibukota_lainnya": 50, "daerah_lainnya": 50 },
+  "90005": { "ibukota_provinsi": 35, "ibukota_lainnya": 32.5, "daerah_lainnya": 31.5 },
+  "53200": { "ibukota_provinsi": 50, "ibukota_lainnya": 50, "daerah_lainnya": 50 },
+  "01120": { "ibukota_provinsi": 15, "ibukota_lainnya": 15, "daerah_lainnya": 15 },
+  "01131": { "ibukota_provinsi": 11.5, "ibukota_lainnya": 11, "daerah_lainnya": 10 },
+  "01411": { "ibukota_provinsi": 11, "ibukota_lainnya": 10, "daerah_lainnya": 9 },
+  "01461": { "ibukota_provinsi": 11, "ibukota_lainnya": 10, "daerah_lainnya": 9 },
+  "03111": { "ibukota_provinsi": 25, "ibukota_lainnya": 23, "daerah_lainnya": 22 },
+  "03221": { "ibukota_provinsi": 25, "ibukota_lainnya": 23, "daerah_lainnya": 22 },
+  "03251": { "ibukota_provinsi": 25, "ibukota_lainnya": 23, "daerah_lainnya": 22 }
+}
