@@ -4,14 +4,7 @@ import { useState } from "react";
 import { mockTransactions } from "@/lib/mock-data";
 import { formatCurrency, relativeTime } from "@/lib/utils/currency";
 import { cn } from "@/lib/utils";
-
-const categoryConfig: Record<string, { label: string; bgClass: string; textClass: string; icon: string; iconBg: string; iconHover: string }> = {
-  Gaji: { label: "Pendapatan", bgClass: "bg-surface-container-highest", textClass: "text-on-surface", icon: "payments", iconBg: "bg-surface-container-highest text-primary", iconHover: "group-hover:bg-primary group-hover:text-on-primary" },
-  Penjualan: { label: "Pendapatan", bgClass: "bg-surface-container-highest", textClass: "text-on-surface", icon: "storefront", iconBg: "bg-surface-container-highest text-primary", iconHover: "group-hover:bg-primary group-hover:text-on-primary" },
-  Cicilan: { label: "Pengeluaran", bgClass: "bg-surface-container-highest", textClass: "text-on-surface", icon: "credit_score", iconBg: "bg-surface-container-highest text-on-surface", iconHover: "group-hover:bg-error group-hover:text-on-error" },
-  Transfer: { label: "Transfer", bgClass: "bg-surface-container-highest", textClass: "text-on-surface", icon: "swap_horiz", iconBg: "bg-surface-container-highest text-secondary", iconHover: "group-hover:bg-secondary group-hover:text-on-secondary" },
-};
-const defaultCfg = { label: "Pengeluaran", bgClass: "bg-surface-container-highest", textClass: "text-on-surface", icon: "receipt", iconBg: "bg-surface-container-highest text-on-surface", iconHover: "group-hover:bg-error group-hover:text-on-error" };
+import { TRANSACTION_CATEGORY_CONFIG, TRANSACTION_DEFAULT_CONFIG } from "@/lib/config/ui-config";
 
 const tabs = ["All Transactions", "Pendapatan", "Pengeluaran", "Aset", "Kewajiban"];
 
@@ -115,7 +108,7 @@ export default function LedgerPage() {
         </div>
 
         {filteredTransactions.map((txn) => {
-          const config = categoryConfig[txn.category] || defaultCfg;
+          const config = TRANSACTION_CATEGORY_CONFIG[txn.category] || TRANSACTION_DEFAULT_CONFIG;
           const isIncome = txn.type === "INCOME";
 
           return (
@@ -124,7 +117,7 @@ export default function LedgerPage() {
               className="grid grid-cols-12 gap-4 p-4 items-center border-b border-outline-variant/50 hover:bg-surface-container-low transition-colors cursor-pointer group"
             >
               <div className="col-span-5 md:col-span-4 flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-full ${config.iconBg} flex items-center justify-center shrink-0 ${config.iconHover} transition-colors`}>
+                <div className={`w-12 h-12 rounded-full ${config.iconBg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
                   <span className="material-symbols-outlined">{config.icon}</span>
                 </div>
                 <div>
@@ -133,7 +126,7 @@ export default function LedgerPage() {
                 </div>
               </div>
               <div className="hidden md:flex col-span-2 items-center">
-                <span className={`px-2.5 py-1 rounded-md ${config.bgClass} ${config.textClass} text-label-sm`}>
+                <span className={`px-2.5 py-1 rounded-md ${config.bgClass} ${config.textClass} text-label-sm font-bold`}>
                   {config.label}
                 </span>
               </div>

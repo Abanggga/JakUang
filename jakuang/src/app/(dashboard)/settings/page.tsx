@@ -47,15 +47,15 @@ export default function SettingsPage() {
           <form className="grid grid-cols-2 gap-6">
             <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
               <label className="text-label-md text-on-surface">Nama Lengkap Sesuai KTP</label>
-              <input type="text" defaultValue={mockUser.name} className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" />
+              <input type="text" defaultValue={mockUser.name} required minLength={3} maxLength={100} className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" />
             </div>
             <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
               <label className="text-label-md text-on-surface">Nomor Telepon</label>
-              <input type="tel" defaultValue="+62 812 3456 7890" className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" />
+              <input type="tel" defaultValue="+62 812 3456 7890" required pattern="^\+?[0-9\s\-]{9,20}$" className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" />
             </div>
             <div className="col-span-2 flex flex-col gap-2">
               <label className="text-label-md text-on-surface">Nomor Pokok Wajib Pajak (NPWP)</label>
-              <input type="text" defaultValue="12.345.678.9-012.000" className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono" />
+              <input type="text" defaultValue="12.345.678.9-012.000" required pattern="[0-9.-]+" minLength={15} maxLength={20} className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono" />
               <p className="text-label-sm text-on-surface-variant mt-1">Pastikan NPWP 15 atau 16 digit sesuai format terbaru DJP.</p>
             </div>
             <div className="col-span-2 flex flex-col gap-2">
