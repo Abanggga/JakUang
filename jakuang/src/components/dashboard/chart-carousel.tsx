@@ -135,7 +135,7 @@ export function ChartCarousel() {
     : formatCurrency(totalAssets);
 
   return (
-    <div className="col-span-1 md:col-span-6 lg:col-span-8 bg-surface-container-lowest rounded-3xl border border-outline-variant/60 shadow-sm p-6 md:p-8 min-h-[400px] flex flex-col">
+    <div className="col-span-1 md:col-span-6 lg:col-span-8 bg-surface-container-lowest rounded-3xl border border-outline-variant/60 shadow-sm p-6 md:p-8 min-h-[400px] flex flex-col w-full min-w-0 overflow-hidden">
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div className="flex bg-surface-container-low p-1 rounded-xl w-full md:w-auto overflow-x-auto no-scrollbar shrink-0">

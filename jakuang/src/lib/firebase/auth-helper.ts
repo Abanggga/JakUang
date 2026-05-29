@@ -42,7 +42,6 @@ export async function syncFirestoreToLocalStorage(uid: string): Promise<boolean>
     } else {
       saveAccounts([
         { id: "acc-1", name: "Kas Utama", type: "KAS_TUNAI", balance: 0 },
-        { id: "acc-2", name: "BCA Tabungan", type: "REKENING", balance: 0 },
       ]);
     }
     

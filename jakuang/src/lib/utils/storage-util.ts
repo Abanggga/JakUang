@@ -77,7 +77,6 @@ const EMPTY_PROFILE: ProfileData = {
 
 const DEFAULT_ACCOUNTS = [
   { id: "acc-1", name: "Kas Utama", type: "KAS_TUNAI", balance: 0 },
-  { id: "acc-2", name: "BCA Tabungan", type: "REKENING", balance: 0 },
 ];
 
 // ── Initialize ──
