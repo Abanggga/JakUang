@@ -17,6 +17,14 @@ export async function syncFirestoreToLocalStorage(uid: string): Promise<boolean>
     const profileSnap = await getDoc(profileRef);
     
     if (!profileSnap.exists()) {
+      // Clear leftover local storage to prevent data inheritance from other users
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("jakuang_profile");
+        localStorage.removeItem("jakuang_transactions");
+        localStorage.removeItem("jakuang_accounts");
+        localStorage.removeItem("jakuang_assets");
+        localStorage.removeItem("jakuang_liabilities");
+      }
       initializeStorage(true);
       return false; // No profile found, needs onboarding
     }
