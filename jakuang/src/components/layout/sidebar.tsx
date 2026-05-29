@@ -134,19 +134,23 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIsOpen?: (
       </nav>
 
       {/* User */}
-      <div className="px-6 mt-auto flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-primary-container flex items-center justify-center shrink-0">
+      <Link 
+        href="/settings" 
+        onClick={() => setIsOpen?.(false)} 
+        className="mx-4 px-4 py-3 flex items-center gap-3 rounded-xl hover:bg-primary-container/30 transition-all cursor-pointer group"
+      >
+        <div className="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border-2 border-primary-container flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
           <span className="material-symbols-outlined text-primary text-[20px]">person</span>
         </div>
         <div className="text-on-primary">
-          <div className="text-label-md truncate max-w-[150px] font-medium">
-            {profile?.name || "Andi Pratama"}
+          <div className="text-label-md truncate max-w-[140px] font-medium">
+            {profile?.name || "Pengguna JakUang"}
           </div>
-          <div className="text-label-sm text-on-primary/70 truncate max-w-[150px]">
-            {profile?.email || "andi@jakuang.id"}
+          <div className="text-label-sm text-on-primary/70 truncate max-w-[140px]">
+            {profile?.email || "contoh@email.com"}
           </div>
         </div>
-      </div>
+      </Link>
 
       {/* Logout */}
       <div className="px-2 mt-4 border-t border-on-primary/10 pt-4">

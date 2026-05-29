@@ -70,8 +70,8 @@ export default function OnboardingPage() {
     initializeStorage(true);
 
     const currentUser = auth.currentUser;
-    const profileName = currentUser?.displayName || "Andi Pratama";
-    const profileEmail = currentUser?.email || "andi@jakuang.id";
+    const profileName = currentUser?.displayName || "Pengguna JakUang";
+    const profileEmail = currentUser?.email || "contoh@email.com";
 
     // Save profile details
     const profile = saveProfile({
