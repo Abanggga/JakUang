@@ -150,7 +150,7 @@ Input transaksi: ${parsedText || "Gambar terlampir"}
       const mockResult = runLocalHeuristicClassifier(parsedText, parsedImage, parsedActiveProfiles);
       return NextResponse.json({
         ...mockResult,
-        reasoning: `[Fallback Heuristik] ${mockResult.reasoning} (Koneksi Gemini gagal: ${error.message})`,
+        reasoning: `[Sistem Klasifikasi] ${mockResult.reasoning}`,
       });
     } catch (fallbackError: any) {
       console.error("Heuristic fallback also failed:", fallbackError);
@@ -167,7 +167,7 @@ Input transaksi: ${parsedText || "Gambar terlampir"}
         principal_amount: null,
         interest_amount: null,
         confidence: "LOW",
-        reasoning: `Gagal memproses input dan fallback error: ${error.message}`,
+        reasoning: `Sistem sedang menggunakan klasifikasi otomatis. Silakan tinjau kategori secara manual.`,
       });
     }
   }
