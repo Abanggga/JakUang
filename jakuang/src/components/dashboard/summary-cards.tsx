@@ -131,11 +131,11 @@ export function SummaryCards() {
   ];
 
   return (
-    <div className="col-span-full flex md:grid md:grid-cols-6 lg:grid-cols-12 gap-card-gap overflow-x-auto md:overflow-visible no-scrollbar snap-x snap-mandatory flex-nowrap md:flex-wrap pb-4 md:pb-0 w-full max-w-full">
+    <>
       {cards.map((card) => (
         <div
           key={card.title}
-          className={`snap-center shrink-0 w-[85vw] sm:w-[350px] md:w-auto ${card.colSpan} ${card.bgClass} rounded-3xl p-6 border shadow-sm flex flex-col justify-between h-48 hover:shadow-md transition-all relative overflow-hidden group`}
+          className={`${card.colSpan} ${card.bgClass} rounded-3xl p-6 border shadow-sm flex flex-col justify-between h-48 hover:shadow-md transition-all relative overflow-hidden group`}
         >
           {card.blobClass && (
             <div className={`absolute -right-8 -top-8 w-32 h-32 ${card.blobClass} rounded-full blur-2xl transition-colors duration-500`} />
@@ -180,6 +180,6 @@ export function SummaryCards() {
           )}
         </div>
       ))}
-    </div>
+    </>
   );
 }
