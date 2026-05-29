@@ -1,159 +1,229 @@
 "use client";
 
-import { mockUser } from "@/lib/mock-data";
+import { useState, useEffect } from "react";
+import { getProfile, saveProfile, ProfileData } from "@/lib/utils/storage-util";
+import { profileLabels } from "@/lib/mock-data";
+import { CheckCircle2 } from "lucide-react";
 
 export default function SettingsPage() {
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [npwp, setNpwp] = useState("");
+  const [kluCode, setKluCode] = useState("");
+  const [domisiliType, setDomisiliType] = useState<any>("daerah_lainnya");
+  const [ptkpStatus, setPtkpStatus] = useState("TK/0");
+  const [activeProfiles, setActiveProfiles] = useState<string[]>([]);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    const data = getProfile();
+    setProfile(data);
+    setName(data.name);
+    setEmail(data.email);
+    setNpwp(data.npwp);
+    setKluCode(data.kluCode);
+    setDomisiliType(data.domisiliType);
+    setPtkpStatus(data.ptkpStatus);
+    setActiveProfiles(data.activeProfiles);
+  }, []);
+
+  const toggleProfile = (p: string) => {
+    setActiveProfiles((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+    );
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated = saveProfile({
+      name,
+      email,
+      npwp,
+      kluCode,
+      domisiliType,
+      ptkpStatus,
+      activeProfiles,
+    });
+    setProfile(updated);
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
+  };
+
+  if (!profile) return <div className="p-8 text-center">Loading settings...</div>;
+
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      <div className="mb-8">
-        <h2 className="text-headline-md text-on-surface mb-2">Pengaturan Profil & Pajak</h2>
-        <p className="text-body-md text-on-surface-variant">Kelola informasi pribadi, klasifikasi usaha, dan preferensi keamanan Anda.</p>
+    <div className="space-y-8 max-w-6xl mx-auto pb-16">
+      <div className="mb-8 flex flex-col md:flex-row justify-between md:items-center gap-4">
+        <div>
+          <h2 className="text-headline-md text-on-surface mb-2">Pengaturan Profil & Pajak</h2>
+          <p className="text-body-md text-on-surface-variant">Kelola informasi pribadi, klasifikasi usaha, dan preferensi keamanan Anda.</p>
+        </div>
+        {success && (
+          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold animate-fade-in shrink-0">
+            <CheckCircle2 className="h-5 w-5" />
+            Pengaturan berhasil disimpan!
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-12 gap-gutter">
-        {/* Profile Summary */}
-        <div className="col-span-12 md:col-span-4 bg-surface rounded-xl border border-outline-variant shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-6 flex flex-col items-center text-center">
+        {/* Profile Summary Card */}
+        <div className="col-span-12 md:col-span-4 bg-surface-container-lowest rounded-3xl border border-outline-variant/60 shadow-sm p-6 flex flex-col items-center text-center h-fit">
           <div className="relative mb-6">
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-surface shadow-sm bg-surface-container-high flex items-center justify-center">
               <span className="material-symbols-outlined text-primary" style={{ fontSize: "64px" }}>person</span>
             </div>
-            <button className="absolute bottom-0 right-0 w-10 h-10 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors border-2 border-surface">
-              <span className="material-symbols-outlined text-[20px]">edit</span>
-            </button>
           </div>
-          <h3 className="text-headline-sm text-on-surface mb-1">{mockUser.name}</h3>
-          <p className="text-body-md text-on-surface-variant mb-4">{mockUser.email}</p>
-          <span className="inline-block bg-surface-container-high text-primary text-label-sm px-3 py-1 rounded-full uppercase tracking-wider mb-6">Verified User</span>
-          <div className="w-full border-t border-outline-variant pt-6 mt-auto">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-body-md text-on-surface-variant">Status NPWP</span>
-              <span className="flex items-center text-secondary text-label-md">
+          <h3 className="text-headline-sm text-on-surface mb-1">{name}</h3>
+          <p className="text-body-md text-on-surface-variant mb-4">{email}</p>
+          <span className="inline-block bg-[#5A45CB]/10 text-primary text-label-sm px-3 py-1 rounded-full uppercase tracking-wider mb-6 font-semibold">
+            WP Orang Pribadi
+          </span>
+          <div className="w-full border-t border-outline-variant/40 pt-6 mt-auto space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-body-md text-on-surface-variant text-sm">Status NPWP</span>
+              <span className="flex items-center text-emerald-600 text-label-md text-sm font-semibold">
                 <span className="material-symbols-outlined text-[18px] mr-1">check_circle</span> Valid
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-body-md text-on-surface-variant">Terakhir Login</span>
-              <span className="text-label-md text-on-surface">Hari ini, 09:41</span>
+              <span className="text-body-md text-on-surface-variant text-sm">PTKP Status</span>
+              <span className="text-label-md text-on-surface text-sm font-semibold">{ptkpStatus}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-body-md text-on-surface-variant text-sm">Domisili</span>
+              <span className="text-label-md text-on-surface text-sm font-semibold">
+                {domisiliType === "ibukota_provinsi"
+                  ? "Ibukota Provinsi"
+                  : domisiliType === "ibukota_lainnya"
+                  ? "Ibukota Lainnya"
+                  : "Daerah Lainnya"}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Personal Info Form */}
-        <div className="col-span-12 md:col-span-8 bg-surface rounded-xl border border-outline-variant shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-6">
-          <h3 className="text-headline-sm text-on-surface mb-6 pb-4 border-b border-outline-variant flex items-center gap-2">
+        <div className="col-span-12 md:col-span-8 bg-surface-container-lowest rounded-3xl border border-outline-variant/60 shadow-sm p-8">
+          <h3 className="text-headline-sm text-lg font-bold text-on-surface mb-6 pb-4 border-b border-outline-variant/40 flex items-center gap-2">
             <span className="material-symbols-outlined text-primary">person</span>
             Informasi Pribadi & Usaha
           </h3>
-          <form className="grid grid-cols-2 gap-6">
+          <form onSubmit={handleSave} className="grid grid-cols-2 gap-6">
             <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
-              <label className="text-label-md text-on-surface">Nama Lengkap Sesuai KTP</label>
-              <input type="text" defaultValue={mockUser.name} required minLength={3} maxLength={100} className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" />
+              <label className="text-label-md text-on-surface font-semibold">Nama Lengkap Sesuai KTP</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                minLength={3}
+                maxLength={100}
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              />
             </div>
             <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
-              <label className="text-label-md text-on-surface">Nomor Telepon</label>
-              <input type="tel" defaultValue="+62 812 3456 7890" required pattern="^\+?[0-9\s\-]{9,20}$" className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" />
+              <label className="text-label-md text-on-surface font-semibold">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              />
             </div>
-            <div className="col-span-2 flex flex-col gap-2">
-              <label className="text-label-md text-on-surface">Nomor Pokok Wajib Pajak (NPWP)</label>
-              <input type="text" defaultValue="12.345.678.9-012.000" required pattern="[0-9.-]+" minLength={15} maxLength={20} className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono" />
-              <p className="text-label-sm text-on-surface-variant mt-1">Pastikan NPWP 15 atau 16 digit sesuai format terbaru DJP.</p>
+            <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
+              <label className="text-label-md text-on-surface font-semibold">Nomor Pokok Wajib Pajak (NPWP)</label>
+              <input
+                type="text"
+                value={npwp}
+                onChange={(e) => setNpwp(e.target.value)}
+                required
+                minLength={15}
+                maxLength={20}
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
+              />
             </div>
-            <div className="col-span-2 flex flex-col gap-2">
-              <label className="text-label-md text-on-surface">Klasifikasi Lapangan Usaha (KLU)</label>
-              <div className="relative">
-                <select className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer">
-                  <option value="62010">6201 - Kegiatan Pemrograman Komputer</option>
-                  <option value="4711">4711 - Perdagangan Eceran Berbagai Macam Barang</option>
-                  <option value="5610">5610 - Restoran dan Penyediaan Makanan Keliling</option>
-                </select>
-                <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+            <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
+              <label className="text-label-md text-on-surface font-semibold">Klasifikasi Lapangan Usaha (KLU)</label>
+              <input
+                type="text"
+                value={kluCode}
+                onChange={(e) => setKluCode(e.target.value)}
+                required
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
+              />
+            </div>
+            <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
+              <label className="text-label-md text-on-surface font-semibold">Status PTKP</label>
+              <select
+                value={ptkpStatus}
+                onChange={(e) => setPtkpStatus(e.target.value)}
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer h-[50px]"
+              >
+                <option value="TK/0">TK/0 (Tidak Kawin, 0 Tanggungan)</option>
+                <option value="TK/1">TK/1 (Tidak Kawin, 1 Tanggungan)</option>
+                <option value="TK/2">TK/2 (Tidak Kawin, 2 Tanggungan)</option>
+                <option value="TK/3">TK/3 (Tidak Kawin, 3 Tanggungan)</option>
+                <option value="K/0">K/0 (Kawin, 0 Tanggungan)</option>
+                <option value="K/1">K/1 (Kawin, 1 Tanggungan)</option>
+                <option value="K/2">K/2 (Kawin, 2 Tanggungan)</option>
+                <option value="K/3">K/3 (Kawin, 3 Tanggungan)</option>
+              </select>
+            </div>
+            <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
+              <label className="text-label-md text-on-surface font-semibold">Domisili (Kategori Wilayah)</label>
+              <select
+                value={domisiliType}
+                onChange={(e) => setDomisiliType(e.target.value as any)}
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer h-[50px]"
+              >
+                <option value="ibukota_provinsi">Ibukota Provinsi (Medan, Jakarta, Surabaya, dll)</option>
+                <option value="ibukota_lainnya">Ibukota Kabupaten/Kota Lainnya</option>
+                <option value="daerah_lainnya">Daerah Lainnya</option>
+              </select>
+            </div>
+
+            {/* Active Profiles Multi-Select */}
+            <div className="col-span-2 flex flex-col gap-3 border-t border-outline-variant/40 pt-6 mt-4">
+              <label className="text-label-md text-on-surface font-semibold">Profil Penghasilan Aktif (Multi-income)</label>
+              <p className="text-xs text-on-surface-variant -mt-1 mb-2">Pilih semua profil pekerjaan yang Anda jalankan saat ini.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Object.entries(profileLabels).map(([key, label]) => {
+                  const isActive = activeProfiles.includes(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleProfile(key)}
+                      className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all ${
+                        isActive
+                          ? "border-[#5A45CB] bg-[#5A45CB]/5 text-[#5A45CB]"
+                          : "border-outline-variant hover:border-[#5A45CB]/30 text-on-surface-variant hover:text-on-surface"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[20px]" style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}>
+                        {isActive ? "check_box" : "check_box_outline_blank"}
+                      </span>
+                      <span className="text-sm font-medium">{label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <div className="col-span-2 flex justify-end mt-4">
-              <button type="button" className="bg-primary text-on-primary text-label-md px-6 py-3 rounded-lg shadow-sm hover:bg-primary/90 transition-colors">
+
+            <div className="col-span-2 flex justify-end mt-6 pt-4 border-t border-outline-variant/40">
+              <button
+                type="submit"
+                className="bg-primary hover:bg-primary-container text-white text-label-md px-8 py-3 rounded-xl shadow-md transition-colors font-bold h-12"
+              >
                 Simpan Perubahan
               </button>
             </div>
           </form>
         </div>
-
-        {/* Tax Scheme */}
-        <div className="col-span-12 bg-surface rounded-xl border border-outline-variant shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-6">
-          <h3 className="text-headline-sm text-on-surface mb-2 flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary">account_balance_wallet</span>
-            Skema Pajak
-          </h3>
-          <p className="text-body-md text-on-surface-variant mb-6">Pilih skema perpajakan yang sesuai dengan profil pendapatan Anda.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { value: "karyawan", icon: "work", title: "Karyawan (Pegawai)", desc: "Penghasilan dari satu pemberi kerja. Menggunakan skema PPh 21 tarif efektif.", selected: false },
-              { value: "umkm", icon: "storefront", title: "UMKM (PP 55/2022)", desc: "Peredaran bruto hingga Rp4,8 M. Tarif final 0.5% (Bebas pajak hingga Rp500jt).", selected: true },
-              { value: "freelance", icon: "laptop_mac", title: "Pekerja Bebas", desc: "Tenaga ahli, dokter, konsultan. Menggunakan Norma Penghitungan Penghasilan Neto (NPPN).", selected: false },
-            ].map((scheme) => (
-              <label key={scheme.value} className={`relative flex flex-col border-2 rounded-xl p-6 cursor-pointer transition-colors ${
-                scheme.selected
-                  ? "bg-surface-container-low border-primary shadow-[0_0_0_1px_rgba(90,69,203,1)]"
-                  : "bg-surface-container-lowest border-outline-variant hover:border-primary/50 group"
-              }`}>
-                <input type="radio" name="tax_scheme" value={scheme.value} defaultChecked={scheme.selected} className="absolute right-4 top-4 w-5 h-5 text-primary border-outline-variant focus:ring-primary" />
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${
-                  scheme.selected
-                    ? "bg-primary text-on-primary shadow-sm"
-                    : "bg-surface-container-low text-primary group-hover:bg-primary-fixed transition-colors"
-                }`}>
-                  <span className="material-symbols-outlined">{scheme.icon}</span>
-                </div>
-                <h4 className="text-headline-sm text-on-surface mb-2">{scheme.title}</h4>
-                <p className="text-body-md text-on-surface-variant">{scheme.desc}</p>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Security */}
-        <div className="col-span-12 bg-surface rounded-xl border border-outline-variant shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-6">
-          <h3 className="text-headline-sm text-on-surface mb-6 pb-4 border-b border-outline-variant flex items-center gap-2">
-            <span className="material-symbols-outlined text-error">security</span>
-            Keamanan Akun
-          </h3>
-          <div className="flex flex-col gap-6 divide-y divide-outline-variant/50">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center py-2">
-              <div>
-                <h4 className="text-label-md text-on-surface">Kata Sandi</h4>
-                <p className="text-body-md text-on-surface-variant mt-1">Terakhir diubah 3 bulan yang lalu.</p>
-              </div>
-              <button className="mt-4 md:mt-0 px-4 py-2 border-[1.5px] border-outline-variant text-on-surface text-label-md rounded-lg hover:bg-surface-container-low transition-colors">
-                Ubah Kata Sandi
-              </button>
-            </div>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center pt-6">
-              <div>
-                <h4 className="text-label-md text-on-surface">Autentikasi Dua Langkah (2FA)</h4>
-                <p className="text-body-md text-on-surface-variant mt-1">Tambahkan lapisan keamanan ekstra.</p>
-              </div>
-              <label className="mt-4 md:mt-0 relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" defaultChecked className="sr-only peer" />
-                <div className="w-11 h-6 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-inner" />
-                <span className="ml-3 text-label-md text-primary">Aktif</span>
-              </label>
-            </div>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center pt-6">
-              <div>
-                <h4 className="text-label-md text-on-surface">Sesi Perangkat</h4>
-                <p className="text-body-md text-on-surface-variant mt-1">Kelola perangkat yang saat ini masuk ke akun Anda.</p>
-              </div>
-              <button className="mt-4 md:mt-0 px-4 py-2 text-error text-label-md hover:bg-error-container rounded-lg transition-colors flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">logout</span>
-                Keluar dari Semua Perangkat
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
-
-      <footer className="mt-16 py-8 border-t border-outline-variant text-center">
-        <p className="text-body-md text-on-surface-variant">© 2025 JakUang Financial OS. Hak Cipta Dilindungi.</p>
-      </footer>
     </div>
   );
 }

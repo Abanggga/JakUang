@@ -25,7 +25,7 @@ export class TaxEngineFactory {
       case "PETERNAK":
       case "NELAYAN":
       case "PEMBUDIDAYA":
-        return new NPPNTaxProfile(klu!, domisili!);
+        return new NPPNTaxProfile(klu || "62010", domisili || "daerah_lainnya");
       default:
         throw new Error(`Unknown profile: ${profile}`);
     }

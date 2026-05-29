@@ -4,6 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { getProfile, ProfileData } from "@/lib/utils/storage-util";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase/client";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -19,6 +23,19 @@ const bottomNavItems = [
 
 export function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIsOpen?: (v: boolean) => void }) {
   const pathname = usePathname();
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+
+  useEffect(() => {
+    // Read profile on mount
+    setProfile(getProfile());
+    
+    // Refresh profile on storage changes
+    const handleStorageChange = () => {
+      setProfile(getProfile());
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
 
   return (
     <aside 
@@ -52,10 +69,12 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIsOpen?: (
 
       {/* Snap & Record CTA */}
       <div className="px-6 mb-4">
-        <button className="w-full bg-primary-fixed text-on-primary-fixed font-bold py-3.5 rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
-          <span className="material-symbols-outlined">camera_alt</span>
-          Snap & Record
-        </button>
+        <Link href="/input" className="block w-full">
+          <button className="w-full bg-primary-fixed text-on-primary-fixed font-bold py-3.5 rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer">
+            <span className="material-symbols-outlined">camera_alt</span>
+            Snap & Record
+          </button>
+        </Link>
       </div>
 
       {/* Navigation */}
@@ -120,20 +139,32 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen?: boolean, setIsOpen?: (
           <span className="material-symbols-outlined text-primary text-[20px]">person</span>
         </div>
         <div className="text-on-primary">
-          <div className="text-label-md">Andi Pratama</div>
-          <div className="text-label-sm text-on-primary/70">Admin</div>
+          <div className="text-label-md truncate max-w-[150px] font-medium">
+            {profile?.name || "Andi Pratama"}
+          </div>
+          <div className="text-label-sm text-on-primary/70 truncate max-w-[150px]">
+            {profile?.email || "andi@jakuang.id"}
+          </div>
         </div>
       </div>
 
       {/* Logout */}
       <div className="px-2 mt-4 border-t border-on-primary/10 pt-4">
-        <Link
-          href="/login"
-          className="text-on-primary/80 hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-colors hover:bg-error/20 rounded-lg"
+        <button
+          onClick={async () => {
+            try {
+              await signOut(auth);
+              localStorage.clear();
+              window.location.href = "/login";
+            } catch (e) {
+              console.error("Sign out error:", e);
+            }
+          }}
+          className="w-full text-left text-on-primary/80 hover:text-on-primary px-4 py-3 flex items-center gap-3 transition-colors hover:bg-error/20 rounded-lg cursor-pointer bg-transparent border-0"
         >
           <span className="material-symbols-outlined">logout</span>
           <span className="text-label-md">Keluar</span>
-        </Link>
+        </button>
       </div>
     </aside>
   );

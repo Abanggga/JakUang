@@ -8,30 +8,76 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { auth, googleProvider } from "@/lib/firebase/client";
+import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { syncFirestoreToLocalStorage } from "@/lib/firebase/auth-helper";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Mock login — redirect to dashboard
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 800);
+    setError(null);
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Sync from Firestore to LocalStorage
+      const hasProfile = await syncFirestoreToLocalStorage(user.uid);
+      
+      if (hasProfile) {
+        router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
+      }
+    } catch (err: any) {
+      console.error("Login error:", err);
+      let errMsg = "Email atau password salah.";
+      if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
+        errMsg = "Email atau password salah.";
+      } else if (err.code === "auth/invalid-email") {
+        errMsg = "Format email tidak valid.";
+      } else if (err.code === "auth/network-request-failed") {
+        errMsg = "Koneksi jaringan terputus. Silakan coba lagi.";
+      } else if (err.code) {
+        errMsg = err.message;
+      }
+      setError(errMsg);
+      setLoading(false);
+    }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 800);
+    setError(null);
+    try {
+      const userCredential = await signInWithPopup(auth, googleProvider);
+      const user = userCredential.user;
+      
+      // Sync from Firestore to LocalStorage
+      const hasProfile = await syncFirestoreToLocalStorage(user.uid);
+      
+      if (hasProfile) {
+        router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
+      }
+    } catch (err: any) {
+      console.error("Google Login error:", err);
+      if (err.code !== "auth/popup-closed-by-user") {
+        setError(err.message || "Gagal masuk menggunakan Google.");
+      }
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,6 +110,13 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-5 pt-2">
+          {error && (
+            <div className="bg-red-50 text-red-700 text-sm p-3.5 rounded-xl border border-red-200 flex items-start gap-2.5">
+              <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="login-email" className="text-sm font-medium">
@@ -119,7 +172,7 @@ export default function LoginPage() {
 
             <Button
               type="submit"
-              className="w-full bg-[#5A45CB] hover:bg-[#442BB5] text-white font-medium h-11"
+              className="w-full bg-[#5A45CB] hover:bg-[#442BB5] text-white font-medium h-11 cursor-pointer"
               disabled={loading}
             >
               {loading ? (
@@ -139,7 +192,7 @@ export default function LoginPage() {
 
           <Button
             variant="outline"
-            className="w-full h-11 gap-3 font-medium"
+            className="w-full h-11 gap-3 font-medium cursor-pointer"
             onClick={handleGoogleLogin}
             disabled={loading}
           >

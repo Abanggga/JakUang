@@ -11,6 +11,16 @@ import { Input } from "@/components/ui/input";
 import { profileLabels } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
+import { 
+  saveProfile, 
+  initializeStorage,
+  getTransactions,
+  getAccounts,
+  getAssets,
+  getLiabilities
+} from "@/lib/utils/storage-util";
+import { auth } from "@/lib/firebase/client";
+import { syncLocalStorageToFirestore } from "@/lib/firebase/auth-helper";
 
 const ptkpOptions = ["TK/0", "K/0", "K/1", "K/2", "K/3"];
 const domisiliOptions = [
@@ -28,7 +38,7 @@ export default function OnboardingPage() {
   const router = useRouter();
 
   const needsKLU = profiles.some((p) =>
-    ["FREELANCE", "KREATIF", "PETANI", "PETERNAK", "NELAYAN"].includes(p)
+    ["FREELANCE", "KREATIF", "GIG", "PETANI", "PETERNAK", "NELAYAN", "PEMBUDIDAYA"].includes(p)
   );
   const totalSteps = needsKLU ? 4 : 3;
 
@@ -45,7 +55,49 @@ export default function OnboardingPage() {
     return true;
   };
 
-  const handleFinish = () => router.push("/dashboard");
+  const handleFinish = async () => {
+    let finalKlu = klu.trim();
+    if (!finalKlu) {
+      if (profiles.includes("PETANI")) finalKlu = "01120";
+      else if (profiles.includes("PETERNAK")) finalKlu = "01411";
+      else if (profiles.includes("NELAYAN")) finalKlu = "03111";
+      else if (profiles.includes("PEMBUDIDAYA")) finalKlu = "03221";
+      else if (profiles.includes("GIG")) finalKlu = "62010";
+      else if (profiles.includes("FREELANCE") || profiles.includes("KREATIF")) finalKlu = "62010";
+    }
+
+    // Initialize state first
+    initializeStorage(true);
+
+    const currentUser = auth.currentUser;
+    const profileName = currentUser?.displayName || "Andi Pratama";
+    const profileEmail = currentUser?.email || "andi@jakuang.id";
+
+    // Save profile details
+    const profile = saveProfile({
+      name: profileName,
+      email: profileEmail,
+      npwp: "",
+      activeProfiles: profiles,
+      ptkpStatus: ptkp,
+      kluCode: finalKlu,
+      domisiliType: domisili as any,
+    });
+
+    if (currentUser) {
+      // Sync local storage state to Firestore for this user
+      await syncLocalStorageToFirestore(
+        currentUser.uid,
+        profile,
+        getTransactions(),
+        getAccounts(),
+        getAssets(),
+        getLiabilities()
+      );
+    }
+
+    router.push("/dashboard");
+  };
 
   const steps = [
     {

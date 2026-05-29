@@ -1,14 +1,19 @@
 "use client";
 
-import { mockTransactions } from "@/lib/mock-data";
+import { useEffect, useState } from "react";
+import { getTransactions } from "@/lib/utils/storage-util";
 import { TransactionRow } from "./transaction-row";
 import Link from "next/link";
 
 export function RecentActivity() {
-  const transactions = mockTransactions.slice(0, 5);
+  const [transactions, setTransactions] = useState<any[]>([]);
+
+  useEffect(() => {
+    setTransactions(getTransactions().slice(0, 5));
+  }, []);
 
   return (
-    <div className="col-span-1 md:col-span-6 lg:col-span-12 bg-surface-container-lowest rounded-3xl border border-outline-variant/60 shadow-sm overflow-hidden flex flex-col">
+    <div className="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-3xl border border-outline-variant/60 shadow-sm overflow-hidden flex flex-col">
       <div className="p-8 border-b border-outline-variant/40 flex justify-between items-center bg-surface/50">
         <div>
           <h3 className="text-headline-sm text-xl font-bold text-on-surface">Aktivitas Terakhir</h3>
@@ -31,7 +36,7 @@ export function RecentActivity() {
           </thead>
           <tbody className="divide-y divide-outline-variant/20">
             {transactions.map((txn) => (
-              <TransactionRow key={txn.id} txn={txn as any} />
+              <TransactionRow key={txn.id} txn={txn} />
             ))}
           </tbody>
         </table>
