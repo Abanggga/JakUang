@@ -1,292 +1,433 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getProfile, getTransactions, getAssets, getLiabilities } from "@/lib/utils/storage-util";
+import {
+  getProfile,
+  getTransactionsForYear,
+  getAssetsAtEndOfYear,
+  getLiabilitiesAtEndOfYear,
+  getAccountBalancesAtEndOfYear,
+  getAvailableTaxYears,
+} from "@/lib/utils/storage-util";
 import { formatCurrency } from "@/lib/utils/currency";
-import { TaxEngineFactory } from "@/lib/tax-engine";
-import { ptkpValues, profileLabels } from "@/lib/mock-data";
+import { Badge } from "@/components/ui/badge";
 
 export default function TaxExportPage() {
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  
+  // Data lists
   const [profile, setProfile] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [assets, setAssets] = useState<any[]>([]);
   const [liabilities, setLiabilities] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  
+  // UI Expand state
+  const [expandedSheet, setExpandedSheet] = useState<"penghasilan" | "harta" | "kewajiban" | null>("penghasilan");
 
-  // Computed values
-  const [totalPKP, setTotalPKP] = useState(0);
-  const [totalTaxDue, setTotalTaxDue] = useState(0);
-  const [profileTaxList, setProfileTaxList] = useState<any[]>([]);
-
-  // Local storage accounts for asset counting
-  const [accountsCount, setAccountsCount] = useState(0);
+  // Load and filter data dynamically based on year
+  useEffect(() => {
+    const years = getAvailableTaxYears();
+    setAvailableYears(years);
+    if (years.length > 0 && !years.includes(selectedYear)) {
+      setSelectedYear(years[0]);
+    }
+  }, []);
 
   useEffect(() => {
     const prof = getProfile();
-    const txs = getTransactions();
-    const asts = getAssets();
-    const lias = getLiabilities();
+    setProfile(prof);
 
-    // Fetch accounts count
-    let accs: any[] = [];
-    try {
-      const item = localStorage.getItem("jakuang_accounts");
-      accs = item ? JSON.parse(item) : [];
-    } catch {
-      accs = [];
+    // Get all records for selected year
+    const rawTxs = getTransactionsForYear(selectedYear);
+    const rawAssets = getAssetsAtEndOfYear(selectedYear);
+    const rawLiabilities = getLiabilitiesAtEndOfYear(selectedYear);
+    const rawAccounts = getAccountBalancesAtEndOfYear(selectedYear);
+
+    setTransactions(rawTxs);
+    setAssets(rawAssets);
+    setLiabilities(rawLiabilities);
+    setAccounts(rawAccounts);
+  }, [selectedYear]);
+
+  // Compute profile summary values
+  const getProfilesSummary = () => {
+    const summaries: any[] = [];
+    const activeProfs = profile?.activeProfiles || [];
+    
+    // If empty active profiles list, fall back to showing all to avoid completely empty view before onboarding/settings are configured
+    const isEmpty = activeProfs.length === 0;
+    const hasEmployee = isEmpty || activeProfs.includes("KARYAWAN") || activeProfs.includes("KARYAWAN_HARIAN");
+    const hasUmkm = isEmpty || activeProfs.includes("UMKM");
+    const hasFreelance = isEmpty || activeProfs.some((p: string) => 
+      ["FREELANCE", "KREATIF", "GIG", "PETANI", "PETERNAK", "NELAYAN", "PEMBUDIDAYA"].includes(p)
+    );
+
+    let profileIndex = 1;
+    
+    // 1. UMKM
+    if (hasUmkm) {
+      const umkmIncome = transactions
+        .filter((t) => t.type === "INCOME" && t.profile === "UMKM")
+        .reduce((sum, t) => sum + t.amount, 0);
+      summaries.push({
+        id: "prof-umkm",
+        badge: `Profil ${profileIndex++}`,
+        badgeColor: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+        icon: "store",
+        title: "Peredaran Bruto UMKM",
+        type: "Peredaran Bruto",
+        amount: umkmIncome,
+        desc: "Dikenakan PPh Final 0.5%"
+      });
     }
 
-    setProfile(prof);
-    setTransactions(txs);
-    setAssets(asts);
-    setLiabilities(lias);
-    setAccountsCount(accs.length);
-
-    // Compute Tax Engine
-    const calculatedTaxes = prof.activeProfiles.map((pType: string) => {
-      const profileIncomes = txs
-        .filter((t) => t.isConfirmed && t.profile === pType && t.type === "INCOME")
+    // 2. Karyawan
+    if (hasEmployee) {
+      const karyawanIncome = transactions
+        .filter((t) => t.type === "INCOME" && t.profile === "KARYAWAN")
         .reduce((sum, t) => sum + t.amount, 0);
+      summaries.push({
+        id: "prof-karyawan",
+        badge: `Profil ${profileIndex++}`,
+        badgeColor: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+        icon: "badge",
+        title: "Penghasilan Karyawan",
+        type: "Penghasilan Netto",
+        amount: karyawanIncome,
+        desc: "Dikenakan PPh Pasal 21"
+      });
+    }
 
-      const ptkp = ptkpValues[prof.ptkpStatus] || 54_000_000;
-      const bpjsEmployee = pType === "KARYAWAN" ? 200_000 * 12 : 0;
+    // 3. Pekerjaan Bebas (NPPN)
+    if (hasFreelance) {
+      const nppnIncome = transactions
+        .filter((t) => t.type === "INCOME" && t.profile !== "UMKM" && t.profile !== "KARYAWAN")
+        .reduce((sum, t) => sum + t.amount, 0);
+      summaries.push({
+        id: "prof-nppn",
+        badge: `Profil ${profileIndex++}`,
+        badgeColor: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
+        icon: "psychology",
+        title: "Pekerjaan Bebas (NPPN)",
+        type: "Penghasilan Netto (Norma)",
+        amount: nppnIncome * 0.5, // standard 50% norm
+        desc: "Dihitung dari Norma 50%"
+      });
+    }
 
-      try {
-        const engine = TaxEngineFactory.create(pType as any, prof.kluCode, prof.domisiliType);
-        const result = engine.calculate({
-          grossIncome: profileIncomes,
-          ptkp,
-          bpjsEmployee,
-        });
-
-        return {
-          type: pType,
-          label: profileLabels[pType] || pType,
-          grossIncome: profileIncomes,
-          netIncome: result.netIncome,
-          taxableIncome: result.taxableIncome,
-          taxDue: result.taxDue,
-          breakdown: result.breakdown,
-        };
-      } catch (err) {
-        console.error(`Error calculating tax in export page for ${pType}`, err);
-        return {
-          type: pType,
-          label: profileLabels[pType] || pType,
-          grossIncome: profileIncomes,
-          netIncome: 0,
-          taxableIncome: 0,
-          taxDue: 0,
-          breakdown: [],
-        };
-      }
-    });
-
-    setProfileTaxList(calculatedTaxes);
-    setTotalPKP(calculatedTaxes.reduce((sum, item) => sum + item.taxableIncome, 0));
-    setTotalTaxDue(calculatedTaxes.reduce((sum, item) => sum + item.taxDue, 0));
-  }, []);
-
-  // Export to CSV helper
-  const handleExportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    
-    // --- SHEET 1: PENGHASILAN & PAJAK ---
-    csvContent += "=== SHEET 1: PENGHASILAN & PAJAK ===\n";
-    csvContent += "Profil,Bruto Tahunan,Penghasilan Neto,PKP,Pajak Terutang\n";
-    profileTaxList.forEach((item) => {
-      csvContent += `"${item.label}",${item.grossIncome},${item.netIncome},${item.taxableIncome},${item.taxDue}\n`;
-    });
-    csvContent += `\nTOTAL,,,${totalPKP},${totalTaxDue}\n\n`;
-
-    // --- SHEET 2: DAFTAR HARTA ---
-    csvContent += "=== SHEET 2: DAFTAR HARTA ===\n";
-    csvContent += "Nama Harta,Kategori,Kode SPT,Nilai Perolehan,Status\n";
-    
-    // assets
-    assets.forEach((ast) => {
-      csvContent += `"${ast.name}","${ast.category}","${ast.sptCode}",${ast.value},"${ast.status}"\n`;
-    });
-    // bank accounts
-    let accs: any[] = [];
-    try {
-      const item = localStorage.getItem("jakuang_accounts");
-      accs = item ? JSON.parse(item) : [];
-    } catch {}
-    accs.forEach((acc) => {
-      csvContent += `"${acc.name}","KAS_DAN_TABUNGAN","041",${acc.balance},"TUNAI"\n`;
-    });
-    csvContent += "\n";
-
-    // --- SHEET 3: DAFTAR KEWAJIBAN ---
-    csvContent += "=== SHEET 3: DAFTAR KEWAJIBAN ===\n";
-    csvContent += "Nama Kreditur,Jenis Pinjaman,Nilai Pokok,Sisa Hutang\n";
-    liabilities.forEach((l) => {
-      csvContent += `"${l.creditor}","${l.type}",${l.principal},${l.remaining}\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `SPT_Tahunan_Jakuang_${new Date().getFullYear()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    return summaries;
   };
+
+  const summaries = getProfilesSummary();
+
+  // Combined assets listing (assets + cash balances)
+  const totalAssetsValue = assets.reduce((sum, a) => sum + (a.value || 0), 0) + accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+  const totalLiabilitiesValue = liabilities.reduce((sum, l) => sum + (l.remaining || 0), 0);
 
   return (
     <div className="space-y-8 pb-16">
-      {/* Header */}
-      <div className="mb-10">
-        <h1 className="text-display-lg text-on-surface tracking-tight">Laporan Pajak</h1>
-        <p className="text-body-lg text-on-surface-variant mt-2 max-w-2xl">
-          Ringkasan estimasi kewajiban perpajakan Anda. Pastikan seluruh data aset dan liabilitas telah dimutakhirkan sebelum mengekspor dokumen SPT.
-        </p>
-      </div>
-
-      {/* Deadline Alert */}
-      <div className="bg-error-container/20 border border-error-container rounded-3xl p-6 flex items-start gap-4">
-        <div className="w-12 h-12 rounded-full bg-error-container flex items-center justify-center shrink-0 text-error">
-          <span className="material-symbols-outlined" style={{ fontSize: "28px" }}>campaign</span>
-        </div>
+      {/* Header & Filter Row */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/60 shadow-sm">
         <div>
-          <h3 className="text-headline-sm text-lg font-bold text-on-surface mb-1">Pengingat Batas Waktu Pelaporan</h3>
-          <p className="text-body-md text-on-surface-variant leading-relaxed">
-            Batas akhir penyampaian SPT Tahunan Wajib Pajak Orang Pribadi adalah tanggal <span className="font-bold text-on-surface">31 Maret</span>. Silakan ekspor data Anda dan laporkan melalui DJP Online untuk menghindari sanksi administrasi.
+          <h1 className="text-3xl font-extrabold text-on-surface tracking-tight">Tax Export (SPT 1770)</h1>
+          <p className="text-sm text-on-surface-variant mt-1 max-w-xl">
+            Review your financial records, assets, and liabilities as of December 31 for tax filing.
           </p>
         </div>
+        
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Year selector */}
+          <div className="flex items-center bg-surface-container-low p-1.5 rounded-2xl border border-outline-variant/30 w-full sm:w-auto">
+            <span className="material-symbols-outlined text-[18px] text-on-surface-variant ml-2.5">calendar_today</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="bg-transparent border-none text-on-surface text-sm font-semibold pr-8 pl-2 py-1 outline-none cursor-pointer w-full sm:w-auto"
+            >
+              {availableYears.map((yr) => (
+                <option key={yr} value={yr}>
+                  Tahun Pajak {yr}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
-      {/* Bento Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-gutter">
-        {/* PKP */}
-        <div className="col-span-12 md:col-span-4 bg-surface-container-lowest rounded-3xl shadow-sm border border-outline-variant p-6 flex flex-col h-full hover:shadow-md transition-shadow">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center">
-                <span className="material-symbols-outlined text-primary text-[20px]">account_balance_wallet</span>
+      {/* Tax Profile Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {summaries.map((sum) => (
+          <div
+            key={sum.id}
+            className="bg-surface-container-lowest border border-outline-variant/60 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all relative overflow-hidden group flex flex-col justify-between min-h-[150px]"
+          >
+            <div className="flex justify-between items-start">
+              <Badge variant="outline" className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sum.badgeColor}`}>
+                {sum.badge}
+              </Badge>
+              <div className="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[20px]">{sum.icon}</span>
               </div>
-              <h3 className="text-label-md text-on-surface-variant font-semibold">Estimasi PKP (Mulai Pajak)</h3>
             </div>
-            <div className="text-display-lg-mobile text-on-surface font-financial font-bold">
-              {formatCurrency(totalPKP)}
+            
+            <div className="mt-4">
+              <h4 className="text-sm font-bold text-on-surface line-clamp-1">{sum.title}</h4>
+              <p className="text-[10px] text-on-surface-variant mt-0.5">{sum.type}</p>
+              <p className="text-2xl font-extrabold text-on-surface font-financial mt-2 tracking-tight">
+                {formatCurrency(sum.amount)}
+              </p>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-outline-variant/30 text-[10px] text-on-surface-variant/80 font-medium">
+              {sum.desc}
             </div>
           </div>
-          <div className="mt-6 pt-4 border-t border-outline-variant/40">
-            <p className="text-label-sm text-on-surface-variant flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px]">info</span>
-              Penghasilan Kena Pajak disetahunkan
+        ))}
+        
+        {/* Placeholder if profile empty */}
+        {summaries.length === 0 && (
+          <div className="col-span-3 bg-surface-container-lowest border border-dashed border-outline-variant rounded-3xl p-8 text-center text-on-surface-variant text-sm">
+            Tidak ada profil pajak aktif untuk akun ini.
+          </div>
+        )}
+      </div>
+
+      {/* SPT 1770 Data Sheets */}
+      <div className="bg-surface-container-lowest rounded-3xl border border-outline-variant/60 shadow-sm p-6 md:p-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-outline-variant/40">
+          <div>
+            <h3 className="text-xl font-extrabold text-on-surface">SPT 1770 Data Sheets</h3>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Review details of your tax schedules for filing.
             </p>
           </div>
+          <Badge className="bg-primary/10 text-primary font-bold border border-primary/20 text-xs px-3 py-1 rounded-full shrink-0">
+            Tahun Pajak: {selectedYear}
+          </Badge>
         </div>
 
-        {/* Pajak Terutang */}
-        <div className="col-span-12 md:col-span-4 bg-surface-container-lowest rounded-3xl shadow-sm border border-outline-variant p-6 flex flex-col h-full hover:shadow-md transition-shadow">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center">
-                <span className="material-symbols-outlined text-tertiary text-[20px]">receipt_long</span>
+        <div className="space-y-4">
+          {/* 1. Lampiran I */}
+          <div className="border border-outline-variant/40 rounded-2xl overflow-hidden bg-surface">
+            <button
+              onClick={() => setExpandedSheet(expandedSheet === "penghasilan" ? null : "penghasilan")}
+              className="w-full flex items-center justify-between p-4 bg-surface-container-low/50 hover:bg-surface-container-low transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-[22px]">receipt_long</span>
+                <div>
+                  <h4 className="text-sm font-bold text-on-surface">Lampiran I — Penghasilan Tahun Berjalan</h4>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">Rekapitulasi seluruh sumber penghasilan selama satu tahun</p>
+                </div>
               </div>
-              <h3 className="text-label-md text-on-surface-variant font-semibold">Total Pajak Terutang (PPh)</h3>
-            </div>
-            <div className="text-display-lg-mobile text-on-surface font-financial font-bold">
-              {formatCurrency(totalTaxDue)}
-            </div>
+              <div className="flex items-center gap-3">
+                <Badge className="bg-green-500/10 text-green-600 border border-green-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  Ready
+                </Badge>
+                <span className={`material-symbols-outlined text-[20px] transition-transform duration-300 ${expandedSheet === "penghasilan" ? "rotate-180" : ""}`}>
+                  expand_more
+                </span>
+              </div>
+            </button>
+
+            {expandedSheet === "penghasilan" && (
+              <div className="p-4 border-t border-outline-variant/20 overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="text-on-surface-variant font-bold border-b border-outline-variant/30 uppercase tracking-wider text-[10px]">
+                      <th className="pb-3 pr-4">Tgl Transaksi</th>
+                      <th className="pb-3 pr-4">Deskripsi</th>
+                      <th className="pb-3 pr-4">Profil Pajak</th>
+                      <th className="pb-3 pr-4 text-right">Nilai Bruto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/10 text-on-surface">
+                    {transactions
+                      .filter((tx) => tx.type === "INCOME")
+                      .map((tx) => (
+                        <tr key={tx.id} className="hover:bg-surface-container-lowest transition-colors">
+                          <td className="py-2.5 pr-4 whitespace-nowrap font-medium text-on-surface-variant">
+                            {tx.date ? new Date(tx.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}
+                          </td>
+                          <td className="py-2.5 pr-4 font-bold">{tx.description}</td>
+                          <td className="py-2.5 pr-4">
+                            <span className="bg-surface-container px-2 py-0.5 rounded-md text-[10px] font-bold text-on-surface-variant">
+                              {tx.profile || "UMKM"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 pr-4 text-right font-bold font-financial">{formatCurrency(tx.amount)}</td>
+                        </tr>
+                      ))}
+                    {transactions.filter((tx) => tx.type === "INCOME").length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-6 text-center text-on-surface-variant font-medium">
+                          Belum ada data penghasilan di tahun ini.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-          <div className="mt-6 pt-4 border-t border-outline-variant/40 flex justify-between items-center text-xs">
-            <p className="text-label-sm text-on-surface-variant">Berdasarkan data profil aktif Anda</p>
+
+          {/* 2. Lampiran IV - Harta */}
+          <div className="border border-outline-variant/40 rounded-2xl overflow-hidden bg-surface">
+            <button
+              onClick={() => setExpandedSheet(expandedSheet === "harta" ? null : "harta")}
+              className="w-full flex items-center justify-between p-4 bg-surface-container-low/50 hover:bg-surface-container-low transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-[22px]">account_balance</span>
+                <div>
+                  <h4 className="text-sm font-bold text-on-surface">Lampiran IV (Harta) — Daftar Aset & Tabungan</h4>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">Daftar kekayaan dan saldo rekening per 31 Desember</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge className="bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full font-financial">
+                  {formatCurrency(totalAssetsValue)}
+                </Badge>
+                <span className={`material-symbols-outlined text-[20px] transition-transform duration-300 ${expandedSheet === "harta" ? "rotate-180" : ""}`}>
+                  expand_more
+                </span>
+              </div>
+            </button>
+
+            {expandedSheet === "harta" && (
+              <div className="p-4 border-t border-outline-variant/20 overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="text-on-surface-variant font-bold border-b border-outline-variant/30 uppercase tracking-wider text-[10px]">
+                      <th className="pb-3 pr-4">Kode SPT</th>
+                      <th className="pb-3 pr-4">Nama Harta / Rekening</th>
+                      <th className="pb-3 pr-4">Tahun Perolehan</th>
+                      <th className="pb-3 pr-4">Status Pembiayaan</th>
+                      <th className="pb-3 pr-4 text-right">Nilai Perolehan / Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/10 text-on-surface">
+                    {/* Bank account balances as of Dec 31 */}
+                    {accounts.map((acc) => (
+                      <tr key={acc.id} className="hover:bg-surface-container-lowest transition-colors">
+                        <td className="py-2.5 pr-4 font-bold text-primary">041</td>
+                        <td className="py-2.5 pr-4 font-bold">{acc.bankName || acc.name} (Saldo per 31 Des)</td>
+                        <td className="py-2.5 pr-4 text-on-surface-variant">{selectedYear}</td>
+                        <td className="py-2.5 pr-4">
+                          <span className="bg-green-500/10 text-green-600 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                            TUNAI
+                          </span>
+                        </td>
+                        <td className="py-2.5 pr-4 text-right font-bold font-financial">{formatCurrency(acc.balance)}</td>
+                      </tr>
+                    ))}
+                    
+                    {/* Other assets */}
+                    {assets.map((a) => (
+                      <tr key={a.id} className="hover:bg-surface-container-lowest transition-colors">
+                        <td className="py-2.5 pr-4 font-bold text-primary">{a.sptCode || "031"}</td>
+                        <td className="py-2.5 pr-4 font-bold">{a.name}</td>
+                        <td className="py-2.5 pr-4 text-on-surface-variant">
+                          {a.date ? new Date(a.date).getFullYear() : selectedYear}
+                        </td>
+                        <td className="py-2.5 pr-4">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            a.status === "KREDIT" 
+                              ? "bg-amber-500/10 text-amber-600" 
+                              : "bg-green-500/10 text-green-600"
+                          }`}>
+                            {a.status || "TUNAI"}
+                          </span>
+                        </td>
+                        <td className="py-2.5 pr-4 text-right font-bold font-financial">{formatCurrency(a.value)}</td>
+                      </tr>
+                    ))}
+                    
+                    {assets.length === 0 && accounts.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-on-surface-variant font-medium">
+                          Tidak ada daftar harta per 31 Desember.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Status & Export */}
-        <div className="col-span-12 md:col-span-4 bg-surface-container-lowest rounded-3xl shadow-sm border border-outline-variant p-6 flex flex-col h-full">
-          <h3 className="text-headline-sm text-lg font-bold text-on-surface mb-6">Status Kesiapan Data</h3>
+          {/* 3. Lampiran IV - Kewajiban */}
+          <div className="border border-outline-variant/40 rounded-2xl overflow-hidden bg-surface">
+            <button
+              onClick={() => setExpandedSheet(expandedSheet === "kewajiban" ? null : "kewajiban")}
+              className="w-full flex items-center justify-between p-4 bg-surface-container-low/50 hover:bg-surface-container-low transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-[22px]">credit_card</span>
+                <div>
+                  <h4 className="text-sm font-bold text-on-surface">Lampiran IV (Kewajiban) — Daftar Hutang Akhir Tahun</h4>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">Sisa saldo hutang/liabilitas outstanding per 31 Desember</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge className="bg-red-500/10 text-red-600 border border-red-500/20 text-[10px] font-bold px-2 py-0.5 rounded-full font-financial">
+                  {formatCurrency(totalLiabilitiesValue)}
+                </Badge>
+                <span className={`material-symbols-outlined text-[20px] transition-transform duration-300 ${expandedSheet === "kewajiban" ? "rotate-180" : ""}`}>
+                  expand_more
+                </span>
+              </div>
+            </button>
 
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-label-md text-on-surface-variant font-semibold">Kelengkapan Form SPT</span>
-              <span className="text-label-md text-primary font-bold">100%</span>
-            </div>
-            <div className="w-full bg-surface-variant rounded-full h-2">
-              <div className="bg-primary h-2 rounded-full" style={{ width: "100%" }} />
-            </div>
+            {expandedSheet === "kewajiban" && (
+              <div className="p-4 border-t border-outline-variant/20 overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="text-on-surface-variant font-bold border-b border-outline-variant/30 uppercase tracking-wider text-[10px]">
+                      <th className="pb-3 pr-4">Kode SPT</th>
+                      <th className="pb-3 pr-4">Nama Pemberi Pinjaman (Kreditur)</th>
+                      <th className="pb-3 pr-4">Jenis Pinjaman</th>
+                      <th className="pb-3 pr-4">Tahun Peminjaman</th>
+                      <th className="pb-3 pr-4 text-right">Sisa Hutang per 31 Des</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/10 text-on-surface">
+                    {liabilities.map((l) => (
+                      <tr key={l.id} className="hover:bg-surface-container-lowest transition-colors">
+                        <td className="py-2.5 pr-4 font-bold text-primary">101</td>
+                        <td className="py-2.5 pr-4 font-bold">{l.creditor}</td>
+                        <td className="py-2.5 pr-4 uppercase text-on-surface-variant">{l.type || "KPR"}</td>
+                        <td className="py-2.5 pr-4 text-on-surface-variant">
+                          {l.startDate ? new Date(l.startDate).getFullYear() : selectedYear}
+                        </td>
+                        <td className="py-2.5 pr-4 text-right font-bold font-financial">{formatCurrency(l.remaining)}</td>
+                      </tr>
+                    ))}
+                    {liabilities.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-on-surface-variant font-medium">
+                          Tidak ada daftar kewajiban per 31 Desember.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-
-          <ul className="space-y-3 mb-8 flex-1">
-            <li className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-              <span className="text-body-md text-on-surface text-sm">Sheet 1: Penghasilan & Pajak ({profile?.activeProfiles.length || 0} profil)</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-              <span className="text-body-md text-on-surface text-sm">Sheet 2: Daftar Harta ({assets.length} aset, {accountsCount} rekening)</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-primary text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-              <span className="text-body-md text-on-surface text-sm">Sheet 3: Daftar Kewajiban ({liabilities.length} pinjaman)</span>
-            </li>
-          </ul>
-
-          <button 
-            onClick={handleExportCSV}
-            className="w-full bg-primary text-on-primary text-label-md py-3.5 px-4 rounded-xl hover:bg-primary-container transition-colors flex items-center justify-center gap-2 shadow-md font-bold cursor-pointer h-12"
-          >
-            <span className="material-symbols-outlined">download</span>
-            Ekspor SPT (.csv)
-          </button>
         </div>
       </div>
 
-      {/* Calculation Breakdown Detail */}
-      <div className="bg-surface-container-lowest rounded-3xl border border-outline-variant/60 shadow-sm p-8 mt-6">
-        <h3 className="text-headline-sm text-lg font-bold text-on-surface mb-6 pb-4 border-b border-outline-variant/40">
-          Rincian Perhitungan Pajak per Profil
-        </h3>
-        
-        <div className="space-y-6">
-          {profileTaxList.map((item) => (
-            <div key={item.type} className="border border-outline-variant/40 rounded-2xl p-6 bg-surface">
-              <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-                <h4 className="text-headline-sm text-base font-bold text-primary">{item.label}</h4>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-on-surface-variant font-medium">Omzet: {formatCurrency(item.grossIncome)}</span>
-                  <span className="bg-primary-container/20 text-primary text-xs px-3 py-1 rounded-full font-bold">
-                    Pajak Terutang: {formatCurrency(item.taxDue)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs font-semibold text-on-surface-variant">
-                <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/20">
-                  <p className="text-[10px] uppercase text-on-surface-variant/75 mb-1">Penghasilan Neto</p>
-                  <p className="text-sm font-bold text-on-surface font-financial">{formatCurrency(item.netIncome)}</p>
-                </div>
-                <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/20">
-                  <p className="text-[10px] uppercase text-on-surface-variant/75 mb-1">PKP (Kena Pajak)</p>
-                  <p className="text-sm font-bold text-on-surface font-financial">{formatCurrency(item.taxableIncome)}</p>
-                </div>
-                <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/20 col-span-1 sm:col-span-2 md:col-span-1">
-                  <p className="text-[10px] uppercase text-on-surface-variant/75 mb-1">Status PTKP</p>
-                  <p className="text-sm font-bold text-on-surface">{profile?.ptkpStatus}</p>
-                </div>
-              </div>
-
-              {item.breakdown.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-outline-variant/30">
-                  <p className="text-[10px] uppercase text-on-surface-variant/75 font-bold mb-2">Rincian Perhitungan</p>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium text-on-surface-variant">
-                    {item.breakdown.map((bd: any) => (
-                      <li key={bd.label} className="flex justify-between border-b border-outline-variant/10 pb-1">
-                        <span>{bd.label}</span>
-                        <span className="font-bold text-on-surface font-financial">
-                          {bd.label.includes("Rate") ? `${(bd.amount * 100).toFixed(0)}%` : formatCurrency(bd.amount)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          ))}
+      {/* Disclaimer Info */}
+      <div className="bg-blue-500/5 border border-blue-500/10 rounded-3xl p-5 flex items-start gap-4">
+        <span className="material-symbols-outlined text-primary text-[24px] shrink-0 mt-0.5">info</span>
+        <div>
+          <h4 className="text-sm font-bold text-on-surface mb-1">Disclaimer Pelaporan Pajak</h4>
+          <p className="text-xs text-on-surface-variant leading-relaxed">
+            Perhitungan dan visualisasi SPT 1770 di atas didasarkan pada transaksi terkonfirmasi yang tersimpan di aplikasi JakUang Anda. Estimasi di atas dibuat untuk membantu Anda mengisi formulir SPT Tahunan resmi di portal DJP Online. Harap verifikasi seluruh angka dengan bukti potong pajak asli Anda sebelum melakukan pelaporan.
+          </p>
         </div>
       </div>
     </div>

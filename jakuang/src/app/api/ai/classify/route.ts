@@ -26,7 +26,7 @@ Aturan klasifikasi:
 1. "INCOME": Pendapatan operasional dari salah satu profil bisnis/pekerjaan.
 2. "EXPENSE": Pengeluaran biaya operasional bisnis/pekerjaan (contoh: pupuk untuk PETANI, pakan untuk PEMBUDIDAYA).
 3. "ASSET_PURCHASE": Beli aset secara tunai (contoh: laptop, motor tunai, traktor). Isi "spt_asset_code" (011-044) dan "asset_name".
-4. "ASSET_CREDIT": Beli aset secara kredit/cicilan. Harus pisahkan DP dan pokok pinjaman.
+4. "ASSET_CREDIT": Beli aset secara kredit/cicilan. "amount" adalah harga total aset (DP + Pokok Kredit), sedangkan "principal_amount" adalah jumlah pokok kredit (di luar DP).
 5. "LOAN_DISBURSEMENT": Pencairan pinjaman baru (contoh: KUR cair).
 6. "LOAN_PAYMENT": Bayar cicilan pinjaman (pokok + bunga).
 7. "TRANSFER": Transfer antar rekening sendiri.
@@ -109,7 +109,7 @@ Input transaksi: ${parsedText || "Gambar terlampir"}
               contents: [{ parts }],
               generationConfig: {
                 temperature: 0.1,
-                maxOutputTokens: 1024,
+                maxOutputTokens: 8192,
                 responseMimeType: "application/json",
               },
             }),
@@ -177,22 +177,12 @@ function runLocalHeuristicClassifier(text: string = "", image?: string, activePr
   const normalizedText = text.toLowerCase();
   const todayStr = new Date().toISOString().split("T")[0];
 
-  // Extract amount
-  let amount = 0;
-  const numbers = normalizedText.match(/\d[\d\.,]*/g);
-  if (numbers) {
-    // Find the largest number or last number that looks like a price
-    for (const numStr of numbers) {
-      const parsed = parseInt(numStr.replace(/[\.,]/g, ""), 10);
-      if (parsed > 1000 && parsed > amount) {
-        amount = parsed;
-      }
-    }
-  }
+  const parsedFinancial = parseTransactionText(text);
+  const amount = parsedFinancial.amount;
 
   // Default structure
   const result: any = {
-    amount: amount || 150000, // Fallback if no amount found
+    amount: amount || 0, // Fallback if no amount found
     date: todayStr,
     description: text ? (text.length > 50 ? text.substring(0, 47) + "..." : text) : "Nota Belanja",
     routing_type: "EXPENSE",
@@ -201,7 +191,7 @@ function runLocalHeuristicClassifier(text: string = "", image?: string, activePr
     spt_asset_code: null,
     asset_name: null,
     loan_type: null,
-    principal_amount: null,
+    principal_amount: parsedFinancial.principal_amount,
     interest_amount: null,
     confidence: "MEDIUM",
     reasoning: "Mengkategorikan berdasarkan kata kunci input teks.",
@@ -215,8 +205,9 @@ function runLocalHeuristicClassifier(text: string = "", image?: string, activePr
       result.spt_asset_code = normalizedText.includes("motor") ? "021" : "022";
       result.asset_name = normalizedText.includes("motor") ? "Motor Honda Beat" : "Mobil Toyota Avanza";
       result.loan_type = "KKB";
-      result.principal_amount = result.amount > 10000000 ? result.amount - 3000000 : 15000000;
-      result.description = "Beli motor Honda Beat kredit";
+      result.amount = amount || 15000000;
+      result.principal_amount = parsedFinancial.principal_amount || (result.amount > 10000000 ? result.amount - 3000000 : 12000000);
+      result.description = normalizedText.includes("motor") ? "Beli motor Honda Beat kredit" : "Beli mobil Toyota Avanza kredit";
       result.confidence = "HIGH";
       result.reasoning = "Pembelian aset kendaraan bermotor dengan skema kredit (KKB).";
       return result;
@@ -225,7 +216,7 @@ function runLocalHeuristicClassifier(text: string = "", image?: string, activePr
       result.category = "KENDARAAN";
       result.spt_asset_code = normalizedText.includes("motor") ? "021" : "022";
       result.asset_name = normalizedText.includes("motor") ? "Motor Honda Beat" : "Mobil Toyota Avanza";
-      result.description = "Beli motor Honda Beat tunai";
+      result.description = normalizedText.includes("motor") ? "Beli motor Honda Beat tunai" : "Beli mobil Toyota Avanza tunai";
       result.confidence = "HIGH";
       result.reasoning = "Pembelian aset kendaraan bermotor secara tunai.";
       return result;
@@ -238,7 +229,7 @@ function runLocalHeuristicClassifier(text: string = "", image?: string, activePr
     result.profile = "KARYAWAN";
     result.category = "Gaji";
     result.description = "Gaji bulanan";
-    result.amount = amount || 10000000;
+    result.amount = amount || 0;
     result.confidence = "HIGH";
     result.reasoning = "Mendeteksi penerimaan gaji karyawan tetap.";
     return result;
@@ -355,7 +346,7 @@ function tryParseJSON(generatedText: string): any {
       // Replace unescaped double quotes inside string fields with single quotes
       const stringKeys = ["description", "reasoning", "asset_name", "category", "creditor_name", "loan_type", "routing_type", "profile", "date"];
       let repaired = clean;
-      
+
       for (const key of stringKeys) {
         const regex = new RegExp(`("${key}"\\s*:\\s*")([\\s\\S]*?)("\\s*(?:,|\\n|\\r|\\}))`, "g");
         repaired = repaired.replace(regex, (match, prefix, val, suffix) => {
@@ -363,11 +354,129 @@ function tryParseJSON(generatedText: string): any {
           return `${prefix}${escapedVal}${suffix}`;
         });
       }
-      
+
       return JSON.parse(repaired);
     } catch (repairErr: any) {
       console.error("JSON repair failed:", repairErr.message);
       throw err;
     }
   }
+}
+
+interface ParsedTransaction {
+  amount: number;
+  dp: number;
+  principal_amount: number | null;
+  installment: number;
+  durationMonths: number;
+}
+
+function parseIndonesianNumber(numStr: string, multiplierStr: string = ""): number {
+  let cleaned = numStr.replace(/,/g, ".");
+  
+  const dotCount = (cleaned.match(/\./g) || []).length;
+  if (dotCount > 1) {
+    cleaned = cleaned.replace(/\./g, "");
+  } else if (dotCount === 1) {
+    const parts = cleaned.split(".");
+    if (parts[1].length === 3 && !multiplierStr) {
+      cleaned = cleaned.replace(/\./g, "");
+    }
+  }
+
+  let value = parseFloat(cleaned);
+  if (isNaN(value)) return 0;
+
+  if (multiplierStr) {
+    const mult = multiplierStr.toLowerCase();
+    if (mult === "juta" || mult === "jt") {
+      value *= 1000000;
+    } else if (mult === "ribu" || mult === "rb") {
+      value *= 1000;
+    } else if (mult === "miliar" || mult === "milyar") {
+      value *= 1000000000;
+    }
+  }
+
+  return value;
+}
+
+function parseTransactionText(text: string): ParsedTransaction {
+  const normalized = text.toLowerCase();
+  
+  let dp = 0;
+  let installment = 0;
+  let durationMonths = 0;
+  let totalPrice = 0;
+
+  // 1. Parse DP
+  const dpRegex = /(?:dp|down\s*payment|uang\s*muka)(?:\s*(?:sebesar|nya|rp)?\s*)*([0-9]+(?:[\.,][0-9]+)*)\s*(juta|jt|ribu|rb|miliar|milyar)?\b/i;
+  const dpMatch = normalized.match(dpRegex);
+  if (dpMatch) {
+    dp = parseIndonesianNumber(dpMatch[1], dpMatch[2]);
+  }
+
+  // 2. Parse Installment (Cicilan)
+  const cicilRegex = /(?:cicilan|cicil|angsuran|angsur)(?:\s*(?:sebesar|nya|rp)?\s*)*([0-9]+(?:[\.,][0-9]+)*)\s*(juta|jt|ribu|rb|miliar|milyar)?\b/i;
+  const cicilMatch = normalized.match(cicilRegex);
+  if (cicilMatch) {
+    installment = parseIndonesianNumber(cicilMatch[1], cicilMatch[2]);
+  }
+
+  // 3. Parse Duration (Tenor)
+  const durationRegex = /(?:selama|tenor|durasi)?\s*([0-9]+)\s*(bulan|bln|tahun|thn|kali)\b/i;
+  const durationMatch = normalized.match(durationRegex);
+  if (durationMatch) {
+    const num = parseInt(durationMatch[1], 10);
+    const unit = durationMatch[2].toLowerCase();
+    if (unit.startsWith("t")) {
+      durationMonths = num * 12;
+    } else {
+      durationMonths = num;
+    }
+  }
+
+  // 4. Parse Total Price (any other number phrase that is large, and not already parsed as dp or installment)
+  const numberPhraseRegex = /(?:rp\.?\s*)?([0-9]+(?:[\.,][0-9]+)*)\s*(juta|jt|ribu|rb|miliar|milyar)?\b/gi;
+  let match;
+  const foundValues: number[] = [];
+  while ((match = numberPhraseRegex.exec(normalized)) !== null) {
+    const val = parseIndonesianNumber(match[1], match[2]);
+    if (val > 0) {
+      foundValues.push(val);
+    }
+  }
+
+  // Find a total price candidate: a value that is NOT dp and NOT installment, and is relatively large (e.g. > 100000)
+  for (const val of foundValues) {
+    if (val !== dp && val !== installment && val > 100000) {
+      totalPrice = val;
+      break;
+    }
+  }
+
+  // Calculate fields
+  let principal_amount = 0;
+  let amount = 0;
+
+  if (dp > 0 || installment > 0) {
+    if (totalPrice > 0) {
+      amount = totalPrice;
+      principal_amount = amount - dp;
+    } else {
+      const computedPrincipal = installment * (durationMonths || 1);
+      amount = dp + computedPrincipal;
+      principal_amount = computedPrincipal;
+    }
+  } else {
+    amount = totalPrice || foundValues[0] || 0;
+  }
+
+  return {
+    amount,
+    dp,
+    principal_amount: principal_amount || null,
+    installment,
+    durationMonths,
+  };
 }

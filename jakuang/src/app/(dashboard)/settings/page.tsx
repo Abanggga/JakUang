@@ -9,8 +9,6 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [npwp, setNpwp] = useState("");
-  const [kluCode, setKluCode] = useState("");
   const [domisiliType, setDomisiliType] = useState<any>("daerah_lainnya");
   const [ptkpStatus, setPtkpStatus] = useState("TK/0");
   const [activeProfiles, setActiveProfiles] = useState<string[]>([]);
@@ -21,8 +19,6 @@ export default function SettingsPage() {
     setProfile(data);
     setName(data.name);
     setEmail(data.email);
-    setNpwp(data.npwp);
-    setKluCode(data.kluCode);
     setDomisiliType(data.domisiliType);
     setPtkpStatus(data.ptkpStatus);
     setActiveProfiles(data.activeProfiles);
@@ -39,8 +35,6 @@ export default function SettingsPage() {
     const updated = saveProfile({
       name,
       email,
-      npwp,
-      kluCode,
       domisiliType,
       ptkpStatus,
       activeProfiles,
@@ -81,12 +75,6 @@ export default function SettingsPage() {
             WP Orang Pribadi
           </span>
           <div className="w-full border-t border-outline-variant/40 pt-6 mt-auto space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-body-md text-on-surface-variant text-sm">Status NPWP</span>
-              <span className="flex items-center text-emerald-600 text-label-md text-sm font-semibold">
-                <span className="material-symbols-outlined text-[18px] mr-1">check_circle</span> Valid
-              </span>
-            </div>
             <div className="flex justify-between items-center">
               <span className="text-body-md text-on-surface-variant text-sm">PTKP Status</span>
               <span className="text-label-md text-on-surface text-sm font-semibold">{ptkpStatus}</span>
@@ -131,28 +119,6 @@ export default function SettingsPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-              />
-            </div>
-            <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
-              <label className="text-label-md text-on-surface font-semibold">Nomor Pokok Wajib Pajak (NPWP)</label>
-              <input
-                type="text"
-                value={npwp}
-                onChange={(e) => setNpwp(e.target.value)}
-                required
-                minLength={15}
-                maxLength={20}
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
-              />
-            </div>
-            <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
-              <label className="text-label-md text-on-surface font-semibold">Klasifikasi Lapangan Usaha (KLU)</label>
-              <input
-                type="text"
-                value={kluCode}
-                onChange={(e) => setKluCode(e.target.value)}
-                required
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono"
               />
             </div>
             <div className="col-span-2 md:col-span-1 flex flex-col gap-2">

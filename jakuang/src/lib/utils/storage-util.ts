@@ -6,10 +6,8 @@ import { doc, setDoc, writeBatch } from "firebase/firestore";
 export interface ProfileData {
   name: string;
   email: string;
-  npwp: string;
   activeProfiles: string[];
   ptkpStatus: string;
-  kluCode: string;
   domisiliType: "ibukota_provinsi" | "ibukota_lainnya" | "daerah_lainnya";
 }
 
@@ -68,10 +66,8 @@ function safeSet(key: string, value: any) {
 const EMPTY_PROFILE: ProfileData = {
   name: "Pengguna JakUang",
   email: "",
-  npwp: "",
   activeProfiles: [],
   ptkpStatus: "TK/0",
-  kluCode: "",
   domisiliType: "daerah_lainnya",
 };
 
@@ -370,4 +366,101 @@ export function confirmTransaction(id: string) {
     setDoc(doc(db, "users", uid, "transactions", tx.id), sanitizeObject(tx))
       .catch(e => console.error("Error confirming transaction in Firestore:", e));
   }
+}
+
+/** Get confirmed transactions for a specific year */
+export function getTransactionsForYear(year: number): any[] {
+  return getTransactions().filter(tx => {
+    if (!tx.date || !tx.isConfirmed) return false;
+    const d = new Date(tx.date);
+    return d.getFullYear() === year;
+  });
+}
+
+/** Get income for a year by profile */
+export function getIncomeForYear(year: number, profile?: string): number {
+  return getTransactionsForYear(year)
+    .filter(tx => tx.type === "INCOME" && (!profile || tx.profile === profile))
+    .reduce((sum, tx) => sum + tx.amount, 0);
+}
+
+/** Get expense for a year */
+export function getExpenseForYear(year: number): number {
+  return getTransactionsForYear(year)
+    .filter(tx => tx.type === "EXPENSE")
+    .reduce((sum, tx) => sum + tx.amount, 0);
+}
+
+/**
+ * Get assets as of Dec 31 of a year.
+ * Assets are included if their purchase date <= Dec 31 of the year.
+ * Assets without dates are always included (assumed pre-existing).
+ */
+export function getAssetsAtEndOfYear(year: number): any[] {
+  const cutoff = new Date(year, 11, 31); // Dec 31
+  return getAssets().filter(a => {
+    if (!a.date) return true; // No date = always included
+    return new Date(a.date) <= cutoff;
+  });
+}
+
+/**
+ * Get liabilities still outstanding as of end of year.
+ * A liability is included if remaining > 0 and startDate <= Dec 31.
+ */
+export function getLiabilitiesAtEndOfYear(year: number): any[] {
+  const cutoff = new Date(year, 11, 31);
+  return getLiabilities().filter(l => {
+    if (l.remaining <= 0) return false;
+    if (!l.startDate) return true;
+    return new Date(l.startDate) <= cutoff;
+  });
+}
+
+/**
+ * Get available tax years from transaction data.
+ * Returns sorted list of years that have transactions.
+ */
+export function getAvailableTaxYears(): number[] {
+  const txs = getTransactions();
+  const years = new Set<number>();
+  for (const tx of txs) {
+    if (tx.date) years.add(new Date(tx.date).getFullYear());
+  }
+  // Always include current year
+  years.add(new Date().getFullYear());
+  return Array.from(years).sort((a, b) => b - a); // newest first
+}
+
+/**
+ * Estimate account balances as of Dec 31 of a given year.
+ * For current year: return current balances.
+ * For past years: reverse-calculate by undoing transactions after that date.
+ */
+export function getAccountBalancesAtEndOfYear(year: number): any[] {
+  const accounts = getAccounts().map(a => ({ ...a })); // clone
+  const currentYear = new Date().getFullYear();
+  
+  if (year >= currentYear) return accounts; // current or future = use current
+  
+  // Reverse transactions that happened AFTER Dec 31 of target year
+  const cutoff = new Date(year + 1, 0, 1); // Jan 1 of next year
+  const laterTxs = getTransactions().filter(tx => {
+    if (!tx.date || !tx.isConfirmed) return false;
+    return new Date(tx.date) >= cutoff;
+  });
+  
+  for (const tx of laterTxs) {
+    // Undo the effect on the first account (standard cash account or whichever was active)
+    const acc = accounts.find(a => a.id === tx.accountId) || accounts[0];
+    if (acc) {
+      if (tx.type === "INCOME") {
+        acc.balance -= tx.amount;
+      } else {
+        acc.balance += tx.amount;
+      }
+    }
+  }
+  
+  return accounts;
 }

@@ -34,13 +34,8 @@ export default function OnboardingPage() {
   const [profiles, setProfiles] = useState<string[]>([]);
   const [ptkp, setPtkp] = useState("");
   const [domisili, setDomisili] = useState("");
-  const [klu, setKlu] = useState("");
+  const totalSteps = 3;
   const router = useRouter();
-
-  const needsKLU = profiles.some((p) =>
-    ["FREELANCE", "KREATIF", "GIG", "PETANI", "PETERNAK", "NELAYAN", "PEMBUDIDAYA"].includes(p)
-  );
-  const totalSteps = needsKLU ? 4 : 3;
 
   const toggleProfile = (p: string) => {
     setProfiles((prev) =>
@@ -56,16 +51,6 @@ export default function OnboardingPage() {
   };
 
   const handleFinish = async () => {
-    let finalKlu = klu.trim();
-    if (!finalKlu) {
-      if (profiles.includes("PETANI")) finalKlu = "01120";
-      else if (profiles.includes("PETERNAK")) finalKlu = "01411";
-      else if (profiles.includes("NELAYAN")) finalKlu = "03111";
-      else if (profiles.includes("PEMBUDIDAYA")) finalKlu = "03221";
-      else if (profiles.includes("GIG")) finalKlu = "62010";
-      else if (profiles.includes("FREELANCE") || profiles.includes("KREATIF")) finalKlu = "62010";
-    }
-
     // Initialize state first
     initializeStorage(true);
 
@@ -77,10 +62,8 @@ export default function OnboardingPage() {
     const profile = saveProfile({
       name: profileName,
       email: profileEmail,
-      npwp: "",
       activeProfiles: profiles,
       ptkpStatus: ptkp,
-      kluCode: finalKlu,
       domisiliType: domisili as any,
     });
 
@@ -174,25 +157,6 @@ export default function OnboardingPage() {
     },
   ];
 
-  if (needsKLU) {
-    steps.push({
-      title: "Kode KLU Anda?",
-      subtitle: "Klasifikasi Lapangan Usaha yang terdaftar di DJP.",
-      content: (
-        <div className="space-y-4">
-          <Input
-            placeholder="Contoh: 62010 (Pemrograman Komputer)"
-            value={klu}
-            onChange={(e) => setKlu(e.target.value)}
-            className="text-lg h-14"
-          />
-          <p className="text-xs text-muted-foreground">
-            Tidak tahu KLU? Biarkan kosong, sistem akan assign default.
-          </p>
-        </div>
-      ),
-    });
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F6F9FF] via-[#E5DEFF] to-[#F6F9FF] flex items-center justify-center p-4">

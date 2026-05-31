@@ -163,9 +163,31 @@ export default function SnapSpeakPage() {
       
       // Override manual inputs if manual mode was used but retain date
       if (mode === "manual") {
-        classification.amount = parseInt(manualAmount.replace(/[^0-9]/g, ""), 10) || classification.amount;
+        const userAmt = parseInt(manualAmount.replace(/[^0-9]/g, ""), 10) || 0;
         classification.description = manualDesc;
         classification.date = manualDate;
+
+        if (classification.routing_type === "ASSET_CREDIT") {
+          // In manual credit purchase, user enters the DP as the nominal.
+          // If the AI predicted a principal amount, the total amount is DP + principal.
+          // Otherwise, default principal to a realistic value if description matches motor/mobil.
+          let principal = classification.principal_amount || classification.principalAmount || 0;
+          if (!principal) {
+            const descLower = manualDesc.toLowerCase();
+            if (descLower.includes("motor") || descLower.includes("honda") || descLower.includes("beat") || descLower.includes("pcx")) {
+              principal = 15000000;
+            } else if (descLower.includes("mobil") || descLower.includes("avanza") || descLower.includes("car")) {
+              principal = 150000000;
+            } else {
+              principal = userAmt * 10; // general fallback
+            }
+          }
+          classification.principal_amount = principal;
+          classification.principalAmount = principal;
+          classification.amount = userAmt + principal;
+        } else {
+          classification.amount = userAmt || classification.amount;
+        }
       }
 
       setAiResult(classification);
@@ -410,15 +432,62 @@ export default function SnapSpeakPage() {
                   />
                 </div>
 
-                <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
-                  <Label>Nominal (IDR)</Label>
-                  <Input
-                    type="number"
-                    value={aiResult.amount || ""}
-                    onChange={(e) => setAiResult({ ...aiResult, amount: Number(e.target.value) })}
-                    className="font-mono font-semibold"
-                  />
-                </div>
+                {aiResult.routing_type === "ASSET_CREDIT" && (
+                  <div className="col-span-2 bg-primary-fixed/5 p-5 rounded-2xl border border-primary-fixed-dim/20 space-y-4">
+                    <div className="flex items-center gap-2 text-primary">
+                      <span className="material-symbols-outlined text-[20px]">credit_card</span>
+                      <span className="text-label-md font-bold uppercase tracking-wider">Struktur Kredit Aset</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <span className="text-xs text-on-surface-variant block mb-1">Uang Muka (DP)</span>
+                        <p className="text-body-lg font-bold text-on-surface">
+                          {formatCurrency(aiResult.amount - (aiResult.principal_amount || aiResult.principalAmount || 0))}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-on-surface-variant block mb-1">Jumlah Kredit Pokok</span>
+                        <p className="text-body-lg font-bold text-on-surface">
+                          {formatCurrency(aiResult.principal_amount || aiResult.principalAmount || 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-on-surface-variant block mb-1">Harga Perolehan Aset</span>
+                        <p className="text-body-lg font-extrabold text-primary">
+                          {formatCurrency(aiResult.amount)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {aiResult.routing_type === "ASSET_CREDIT" ? (
+                  <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
+                    <Label>Uang Muka / Down Payment (DP)</Label>
+                    <Input
+                      type="number"
+                      value={(aiResult.amount - (aiResult.principal_amount || aiResult.principalAmount || 0)) || ""}
+                      onChange={(e) => {
+                        const newDP = Number(e.target.value);
+                        setAiResult({
+                          ...aiResult,
+                          amount: newDP + (aiResult.principal_amount || aiResult.principalAmount || 0),
+                        });
+                      }}
+                      className="font-mono font-semibold"
+                    />
+                  </div>
+                ) : (
+                  <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
+                    <Label>Nominal (IDR)</Label>
+                    <Input
+                      type="number"
+                      value={aiResult.amount || ""}
+                      onChange={(e) => setAiResult({ ...aiResult, amount: Number(e.target.value) })}
+                      className="font-mono font-semibold"
+                    />
+                  </div>
+                )}
 
                 <div className="col-span-2 md:col-span-1 flex flex-col gap-2">
                   <Label>Tanggal</Label>
@@ -509,7 +578,7 @@ export default function SnapSpeakPage() {
                         className="w-full bg-surface-container border border-outline-variant rounded-lg px-3 py-2 text-body-md text-on-surface focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer h-10"
                       >
                         <option value="KUR">KUR (Kredit Usaha Rakyat)</option>
-                        <option value="KKB">KKB (Kredit Kendaraan Bermotor)</option>
+                        <option value="KKB">Kredit Kendaraan Bermotor</option>
                         <option value="KPR">KPR (Kredit Pemilikan Rumah)</option>
                         <option value="PINJOL">Pinjaman Online</option>
                         <option value="HUTANG_USAHA">Hutang Dagang / Usaha</option>
@@ -541,7 +610,16 @@ export default function SnapSpeakPage() {
                         <Input
                           type="number"
                           value={aiResult.principal_amount || aiResult.principalAmount || ""}
-                          onChange={(e) => setAiResult({ ...aiResult, principal_amount: Number(e.target.value) })}
+                          onChange={(e) => {
+                            const newPrincipal = Number(e.target.value);
+                            const currentDP = aiResult.amount - (aiResult.principal_amount || aiResult.principalAmount || 0);
+                            setAiResult({
+                              ...aiResult,
+                              principal_amount: newPrincipal,
+                              principalAmount: newPrincipal,
+                              amount: currentDP + newPrincipal,
+                            });
+                          }}
                           placeholder="Nilai yang dikreditkan"
                         />
                       </div>
