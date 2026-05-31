@@ -39,3 +39,25 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Design & Mockups
+/desain new/
+/desain*/
+
+# Firebase Configs & Logs
+.firebaserc
+firebase.json
+firestore.indexes.json
+firestore.rules
+storage.rules
+firebase-debug.log
+
+# Docker Configs
+Dockerfile
+.dockerignore
+
+# Markdown Docs (except README, AGENTS, CLAUDE)
+*.md
+!README.md
+!AGENTS.md
+!CLAUDE.md
