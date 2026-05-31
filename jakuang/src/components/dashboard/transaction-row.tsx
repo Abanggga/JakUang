@@ -38,8 +38,8 @@ export function TransactionRow({ txn }: { txn: TransactionData }) {
         <span className={cn(
           "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border",
           txn.isConfirmed
-            ? "bg-amber-50 text-amber-700 border-amber-200"
-            : "bg-surface-container-lowest text-on-surface-variant border-outline-variant"
+            ? "bg-green-50 text-green-700 border-green-200"
+            : "bg-amber-50 text-amber-700 border-amber-200"
         )}>
           <span className="material-symbols-outlined text-[14px]">
             {txn.isConfirmed ? "check_circle" : "pending"}

@@ -11,6 +11,16 @@ import { Input } from "@/components/ui/input";
 import { profileLabels } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
+import { 
+  saveProfile, 
+  initializeStorage,
+  getTransactions,
+  getAccounts,
+  getAssets,
+  getLiabilities
+} from "@/lib/utils/storage-util";
+import { auth } from "@/lib/firebase/client";
+import { syncLocalStorageToFirestore } from "@/lib/firebase/auth-helper";
 
 const ptkpOptions = ["TK/0", "K/0", "K/1", "K/2", "K/3"];
 const domisiliOptions = [
@@ -24,13 +34,8 @@ export default function OnboardingPage() {
   const [profiles, setProfiles] = useState<string[]>([]);
   const [ptkp, setPtkp] = useState("");
   const [domisili, setDomisili] = useState("");
-  const [klu, setKlu] = useState("");
+  const totalSteps = 3;
   const router = useRouter();
-
-  const needsKLU = profiles.some((p) =>
-    ["FREELANCE", "KREATIF", "PETANI", "PETERNAK", "NELAYAN"].includes(p)
-  );
-  const totalSteps = needsKLU ? 4 : 3;
 
   const toggleProfile = (p: string) => {
     setProfiles((prev) =>
@@ -45,7 +50,37 @@ export default function OnboardingPage() {
     return true;
   };
 
-  const handleFinish = () => router.push("/dashboard");
+  const handleFinish = async () => {
+    // Initialize state first
+    initializeStorage(true);
+
+    const currentUser = auth.currentUser;
+    const profileName = currentUser?.displayName || "Pengguna JakUang";
+    const profileEmail = currentUser?.email || "contoh@email.com";
+
+    // Save profile details
+    const profile = saveProfile({
+      name: profileName,
+      email: profileEmail,
+      activeProfiles: profiles,
+      ptkpStatus: ptkp,
+      domisiliType: domisili as any,
+    });
+
+    if (currentUser) {
+      // Sync local storage state to Firestore for this user
+      await syncLocalStorageToFirestore(
+        currentUser.uid,
+        profile,
+        getTransactions(),
+        getAccounts(),
+        getAssets(),
+        getLiabilities()
+      );
+    }
+
+    router.push("/dashboard");
+  };
 
   const steps = [
     {
@@ -122,25 +157,6 @@ export default function OnboardingPage() {
     },
   ];
 
-  if (needsKLU) {
-    steps.push({
-      title: "Kode KLU Anda?",
-      subtitle: "Klasifikasi Lapangan Usaha yang terdaftar di DJP.",
-      content: (
-        <div className="space-y-4">
-          <Input
-            placeholder="Contoh: 62010 (Pemrograman Komputer)"
-            value={klu}
-            onChange={(e) => setKlu(e.target.value)}
-            className="text-lg h-14"
-          />
-          <p className="text-xs text-muted-foreground">
-            Tidak tahu KLU? Biarkan kosong, sistem akan assign default.
-          </p>
-        </div>
-      ),
-    });
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F6F9FF] via-[#E5DEFF] to-[#F6F9FF] flex items-center justify-center p-4">
